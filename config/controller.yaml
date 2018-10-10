@@ -30,6 +30,7 @@ spec:
         args: [
           "-logtostderr",
           "-stderrthreshold", "INFO",
+          "--output-handler-image", "gcr.io/dlorenc-vmtest2/outputs-6ed35446ed4d7b1c10ba0b7c880ae119@sha256:94d1de456ccb100fe8e48dc9c6e053339e2d24435af628ce709e9afe822c700a",
         ]
         volumeMounts:
         - name: config-logging

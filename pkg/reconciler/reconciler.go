@@ -46,6 +46,12 @@ type Options struct {
 
 	ConfigMapWatcher configmap.Watcher
 	Logger           *zap.SugaredLogger
+	ImageOptions     ImageOptions
+}
+
+// ImageOptions defines the names of images to use within a TaskRun.
+type ImageOptions struct {
+	OutputHandlerImage string
 }
 
 // Base implements the core controller logic, given a Reconciler.

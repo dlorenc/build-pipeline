@@ -48,8 +48,9 @@ const (
 )
 
 var (
-	masterURL  string
-	kubeconfig string
+	masterURL          string
+	kubeconfig         string
+	outputHandlerImage string
 )
 
 func main() {
@@ -107,6 +108,9 @@ func main() {
 		SharedClientSet:   sharedClient,
 		PipelineClientSet: pipelineClient,
 		Logger:            logger,
+		ImageOptions: reconciler.ImageOptions{
+			OutputHandlerImage: outputHandlerImage,
+		},
 	}
 
 	taskInformer := pipelineInformerFactory.Pipeline().V1alpha1().Tasks()
@@ -115,6 +119,7 @@ func main() {
 
 	pipelineInformer := pipelineInformerFactory.Pipeline().V1alpha1().Pipelines()
 	pipelineRunInformer := pipelineInformerFactory.Pipeline().V1alpha1().PipelineRuns()
+
 	// Build all of our controllers, with the clients constructed above.
 	controllers := []*controller.Impl{
 		// Pipeline Controllers
@@ -171,4 +176,6 @@ func main() {
 func init() {
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
 	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
+	flag.StringVar(&outputHandlerImage, "output-handler-image", "", "The name of the image to be used as the output handler.")
+
 }

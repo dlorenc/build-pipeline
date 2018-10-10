@@ -21,6 +21,8 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/knative/build-pipeline/pkg/reconciler/v1alpha1/taskrun/resources"
+
 	"github.com/knative/build-pipeline/pkg/apis/pipeline/v1alpha1"
 	"github.com/knative/build-pipeline/pkg/reconciler"
 	buildv1alpha1 "github.com/knative/build/pkg/apis/build/v1alpha1"
@@ -68,6 +70,7 @@ type Reconciler struct {
 	buildTemplateLister        buildlisters.BuildTemplateLister
 	clusterBuildTemplateLister buildlisters.ClusterBuildTemplateLister
 	tracker                    tracker.Interface
+	imageOptions               reconciler.ImageOptions
 }
 
 // Check that our Reconciler implements controller.Reconciler
@@ -84,6 +87,7 @@ func NewController(
 
 	c := &Reconciler{
 		Base:          reconciler.NewBase(opt, taskRunAgentName),
+		imageOptions:  opt.ImageOptions,
 		taskRunLister: taskRunInformer.Lister(),
 		taskLister:    taskInformer.Lister(),
 		buildLister:   buildInformer.Lister(),
@@ -199,7 +203,7 @@ func (c *Reconciler) reconcile(ctx context.Context, tr *v1alpha1.TaskRun) error 
 
 		// make build obj from task buildspec
 		logger.Infof("make build: %s", tr.Name)
-		if b, err = c.makeBuild(t, tr); err != nil {
+		if b, err = c.makeBuild(ctx, t, tr); err != nil {
 			return fmt.Errorf("failed to create a build for taskrun: %v", err)
 		}
 	}
@@ -241,7 +245,8 @@ func (c *Reconciler) deleteTaskRun(namespace, name string) error {
 }
 
 // makeBuild creates a build from the task, using the task's buildspec.
-func (c *Reconciler) makeBuild(t *v1alpha1.Task, tr *v1alpha1.TaskRun) (*buildv1alpha1.Build, error) {
+func (c *Reconciler) makeBuild(ctx context.Context, t *v1alpha1.Task, tr *v1alpha1.TaskRun) (*buildv1alpha1.Build, error) {
+	logger := logging.FromContext(ctx)
 	if t.Spec.BuildSpec == nil {
 		return nil, fmt.Errorf("nil BuildSpec")
 	}
@@ -255,6 +260,9 @@ func (c *Reconciler) makeBuild(t *v1alpha1.Task, tr *v1alpha1.TaskRun) (*buildv1
 		},
 		Spec: *t.Spec.BuildSpec,
 	}
+
+	b = resources.AddOutputResources(c.imageOptions.OutputHandlerImage, b, t, tr, logger)
+
 	return c.BuildClientSet.BuildV1alpha1().Builds(tr.Namespace).Create(b)
 }
 
