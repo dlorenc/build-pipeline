@@ -114,27 +114,6 @@ func validatePipelineResources(ctx context.Context, resources []TaskResourceBind
 	return nil
 }
 
-// Validate validates that the task trigger is of a known type. If it was triggered by a PipelineRun, the
-// name of the trigger should be the name of a PipelienRun.
-func (r TaskTrigger) Validate(ctx context.Context, path string) *apis.FieldError {
-	if r.Type == "" {
-		return nil
-	}
-
-	taskType := strings.ToLower(string(r.Type))
-	for _, allowed := range []TaskTriggerType{TaskTriggerTypePipelineRun, TaskTriggerTypeManual} {
-		allowedType := strings.ToLower(string(allowed))
-
-		if taskType == allowedType {
-			if allowedType == strings.ToLower(string(TaskTriggerTypePipelineRun)) && r.Name == "" {
-				return apis.ErrMissingField(fmt.Sprintf("%s.name", path))
-			}
-			return nil
-		}
-	}
-	return apis.ErrInvalidValue(string(r.Type), fmt.Sprintf("%s.type", path))
-}
-
 func validateParameters(params []Param) *apis.FieldError {
 	// Template must not duplicate parameter names.
 	seen := map[string]struct{}{}
