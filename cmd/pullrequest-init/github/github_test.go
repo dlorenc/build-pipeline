@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package github
 
 import (
 	"context"
@@ -27,6 +27,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/tektoncd/pipeline/cmd/pullrequest-init/types"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-github/github"
@@ -127,7 +128,7 @@ func TestGitHubParseURL_errors(t *testing.T) {
 	}
 }
 
-func TestNewGitHubHandler(t *testing.T) {
+func TestNewHandler(t *testing.T) {
 	ctx := context.Background()
 
 	for _, tt := range []struct {
@@ -138,9 +139,9 @@ func TestNewGitHubHandler(t *testing.T) {
 		{"https://github.tekton.dev/tektoncd/pipeline/pull/1", "github.tekton.dev"},
 	} {
 		t.Run(tt.in, func(t *testing.T) {
-			h, err := NewGitHubHandler(ctx, zaptest.NewLogger(t, zaptest.WrapOptions(zap.AddCaller())).Sugar(), tt.in)
+			h, err := NewHandler(ctx, zaptest.NewLogger(t, zaptest.WrapOptions(zap.AddCaller())).Sugar(), tt.in)
 			if err != nil {
-				t.Fatalf("error creating GitHubHandler: %v", err)
+				t.Fatalf("error creating Handler: %v", err)
 			}
 			if h.BaseURL.Host != tt.out {
 				t.Fatalf("error unexpected BaseURL.Host: %v", h.BaseURL.Host)
@@ -163,7 +164,7 @@ func githubClient(t *testing.T, gh *FakeGitHub) (*github.Client, func()) {
 	return client, s.Close
 }
 
-func newHandler(ctx context.Context, t *testing.T) (*GitHubHandler, func()) {
+func newHandler(ctx context.Context, t *testing.T) (*Handler, func()) {
 	t.Helper()
 
 	gh := NewFakeGitHub()
@@ -175,9 +176,9 @@ func newHandler(ctx context.Context, t *testing.T) (*GitHubHandler, func()) {
 		t.Fatalf("Create Comment: %v", err)
 	}
 
-	h, err := NewGitHubHandler(ctx, zaptest.NewLogger(t, zaptest.WrapOptions(zap.AddCaller())).Sugar(), pr.GetHTMLURL())
+	h, err := NewHandler(ctx, zaptest.NewLogger(t, zaptest.WrapOptions(zap.AddCaller())).Sugar(), pr.GetHTMLURL())
 	if err != nil {
-		t.Fatalf("error creating GitHubHandler: %v", err)
+		t.Fatalf("error creating Handler: %v", err)
 	}
 	// Override GitHub client to point to local test server.
 	h.Client = client
@@ -199,27 +200,27 @@ func TestGitHub(t *testing.T) {
 	rawPRPath := filepath.Join(dir, "github/pr.json")
 	rawCommentPath := filepath.Join(dir, "github/comments/1.json")
 
-	wantPR := &PullRequest{
+	wantPR := &types.PullRequest{
 		Type: "github",
 		ID:   int64(prNum),
-		Head: &GitReference{
+		Head: &types.GitReference{
 			Repo:   pr.GetHead().GetRepo().GetCloneURL(),
 			Branch: pr.GetHead().GetRef(),
 			SHA:    pr.GetHead().GetSHA(),
 		},
-		Base: &GitReference{
+		Base: &types.GitReference{
 			Repo:   pr.GetBase().GetRepo().GetCloneURL(),
 			Branch: pr.GetBase().GetRef(),
 			SHA:    pr.GetBase().GetSHA(),
 		},
-		Statuses: []*Status{},
-		Comments: []*Comment{{
+		Statuses: []*types.Status{},
+		Comments: []*types.Comment{{
 			ID:     comment.GetID(),
 			Author: comment.GetUser().GetLogin(),
 			Text:   comment.GetBody(),
 			Raw:    rawCommentPath,
 		}},
-		Labels:    []*Label{},
+		Labels:    []*types.Label{},
 		Raw:       rawPRPath,
 		RawStatus: rawStatusPath,
 	}
@@ -234,32 +235,32 @@ func TestUpload(t *testing.T) {
 	h, close := newHandler(ctx, t)
 	defer close()
 
-	tektonPR := &PullRequest{
+	tektonPR := &types.PullRequest{
 		Type: "github",
 		ID:   int64(prNum),
-		Head: &GitReference{
+		Head: &types.GitReference{
 			Repo:   pr.GetHead().GetRepo().GetCloneURL(),
 			Branch: pr.GetHead().GetRef(),
 			SHA:    pr.GetHead().GetSHA(),
 		},
-		Base: &GitReference{
+		Base: &types.GitReference{
 			Repo:   pr.GetBase().GetRepo().GetCloneURL(),
 			Branch: pr.GetBase().GetRef(),
 			SHA:    pr.GetBase().GetSHA(),
 		},
-		Comments: []*Comment{{
+		Comments: []*types.Comment{{
 			ID:     comment.GetID(),
 			Author: comment.GetUser().GetLogin(),
 			Text:   comment.GetBody(),
 		}, {
 			Text: "abc123",
 		}},
-		Labels: []*Label{{
+		Labels: []*types.Label{{
 			Text: "tacocat",
 		}},
-		Statuses: []*Status{{
+		Statuses: []*types.Status{{
 			ID:          "Tekton",
-			Code:        Success,
+			Code:        types.Success,
 			Description: "Test all the things!",
 			URL:         "https://tekton.dev",
 		}},
@@ -353,20 +354,20 @@ func TestParseGitHubURL(t *testing.T) {
 }
 
 func TestBaseGitHubPullRequest(t *testing.T) {
-	want := &PullRequest{
+	want := &types.PullRequest{
 		Type: "github",
 		ID:   1,
-		Head: &GitReference{
+		Head: &types.GitReference{
 			Repo:   "https://github.com/baz/bar",
 			Branch: "feature",
 			SHA:    "2",
 		},
-		Base: &GitReference{
+		Base: &types.GitReference{
 			Repo:   "https://github.com/foo/bar",
 			Branch: "master",
 			SHA:    "1",
 		},
-		Labels: []*Label{{
+		Labels: []*types.Label{{
 			Text: "tacocat",
 		}},
 	}
@@ -402,7 +403,7 @@ func TestCreateNewComments(t *testing.T) {
 	h, close := newHandler(ctx, t)
 	defer close()
 
-	comments := []*Comment{
+	comments := []*types.Comment{
 		{
 			// Forces comment creation to fail.
 			Text: ErrorKeyword,
@@ -450,7 +451,7 @@ func TestUpdateExistingComments(t *testing.T) {
 	}
 	comment3.Body = github.String("tacocat")
 
-	comments := map[int64]*Comment{
+	comments := map[int64]*types.Comment{
 		// Non-existant comment. Should be ignored.
 		8675309: {
 			ID:   8675309,
@@ -468,7 +469,7 @@ func TestUpdateExistingComments(t *testing.T) {
 		},
 		// Comment 1 should be deleted.
 	}
-	manifest := Manifest{
+	manifest := types.Manifest{
 		strconv.FormatInt(comment.GetID(), 10):  true,
 		strconv.FormatInt(comment2.GetID(), 10): true,
 		strconv.FormatInt(comment3.GetID(), 10): true,
@@ -507,7 +508,7 @@ func TestUploadComments(t *testing.T) {
 	}
 	comment3.Body = github.String("tacocat")
 
-	comments := []*Comment{
+	comments := []*types.Comment{
 		// Non-existant comment. Should be ignored.
 		{
 			ID:   8675309,
@@ -525,7 +526,7 @@ func TestUploadComments(t *testing.T) {
 		},
 		// Comment 1 should be deleted.
 	}
-	manifest := Manifest{
+	manifest := types.Manifest{
 		strconv.FormatInt(comment.GetID(), 10):  true,
 		strconv.FormatInt(comment2.GetID(), 10): true,
 		strconv.FormatInt(comment3.GetID(), 10): true,
@@ -567,24 +568,24 @@ func TestGetStatuses(t *testing.T) {
 
 	testCases := []struct {
 		sha  string
-		want []*Status
+		want []*types.Status
 	}{
 		{
 			sha: sha,
-			want: []*Status{
+			want: []*types.Status{
 				{
 					ID:   "a",
-					Code: Success,
+					Code: types.Success,
 				},
 				{
 					ID:   "b",
-					Code: Failure,
+					Code: types.Failure,
 				},
 			},
 		},
 		{
 			sha:  "deadbeef",
-			want: []*Status{},
+			want: []*types.Status{},
 		},
 	}
 
@@ -596,7 +597,7 @@ func TestGetStatuses(t *testing.T) {
 			if err != nil {
 				t.Fatalf("getStatuses: %v", err)
 			}
-			if diff := cmp.Diff(tc.want, s, cmpopts.SortSlices(func(x, y *Status) bool { return x.ID < y.ID })); diff != "" {
+			if diff := cmp.Diff(tc.want, s, cmpopts.SortSlices(func(x, y *types.Status) bool { return x.ID < y.ID })); diff != "" {
 				t.Errorf("-want +got: %s", diff)
 			}
 		})
@@ -628,13 +629,13 @@ func TestUploadStatuses(t *testing.T) {
 	h, close := newHandler(ctx, t)
 	defer close()
 
-	s := []*Status{
+	s := []*types.Status{
 		// Invaid status code. Should fail.
 		{
-			Code: StatusCode(""),
+			Code: types.StatusCode(""),
 		},
 		{
-			Code: Failure,
+			Code: types.Failure,
 		},
 		// Should overwrite previous status.
 		{
@@ -682,32 +683,32 @@ func TestUpload_newCommentAndLabel(t *testing.T) {
 	}
 
 	// Upload Tekton PR resource.
-	tektonPR := &PullRequest{
+	tektonPR := &types.PullRequest{
 		Type: "github",
 		ID:   int64(prNum),
-		Head: &GitReference{
+		Head: &types.GitReference{
 			Repo:   pr.GetHead().GetRepo().GetCloneURL(),
 			Branch: pr.GetHead().GetRef(),
 			SHA:    pr.GetHead().GetSHA(),
 		},
-		Base: &GitReference{
+		Base: &types.GitReference{
 			Repo:   pr.GetBase().GetRepo().GetCloneURL(),
 			Branch: pr.GetBase().GetRef(),
 			SHA:    pr.GetBase().GetSHA(),
 		},
-		Comments: []*Comment{{
+		Comments: []*types.Comment{{
 			ID:     comment.GetID(),
 			Author: comment.GetUser().GetLogin(),
 			Text:   comment.GetBody(),
 		}, {
 			Text: "abc123",
 		}},
-		Labels: []*Label{{
+		Labels: []*types.Label{{
 			Text: "tacocat",
 		}},
-		Statuses: []*Status{{
+		Statuses: []*types.Status{{
 			ID:          "Tekton",
-			Code:        Success,
+			Code:        types.Success,
 			Description: "Test all the things!",
 			URL:         "https://tekton.dev",
 		}},

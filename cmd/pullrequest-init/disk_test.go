@@ -28,44 +28,45 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/tektoncd/pipeline/cmd/pullrequest-init/types"
 )
 
 func TestToDisk(t *testing.T) {
-	tektonPr := PullRequest{
+	tektonPr := types.PullRequest{
 		Type: "github",
 		ID:   123,
-		Head: &GitReference{
+		Head: &types.GitReference{
 			Repo:   "foo1",
 			Branch: "branch1",
 			SHA:    "sha1",
 		},
-		Base: &GitReference{
+		Base: &types.GitReference{
 			Repo:   "foo2",
 			Branch: "branch2",
 			SHA:    "sha2",
 		},
-		Statuses: []*Status{
+		Statuses: []*types.Status{
 			{
 				ID:          "123",
-				Code:        Success,
+				Code:        types.Success,
 				Description: "foobar",
 				URL:         "https://foo.bar",
 			},
 			{
 				ID:          "cla/foo",
-				Code:        Success,
+				Code:        types.Success,
 				Description: "bazbat",
 				URL:         "https://baz.bat",
 			},
 		},
-		Comments: []*Comment{
+		Comments: []*types.Comment{
 			{
 				Text:   "hey",
 				Author: "me",
 				ID:     123,
 			},
 		},
-		Labels: []*Label{
+		Labels: []*types.Label{
 			{Text: "help"},
 			{Text: "me"},
 			{Text: "foo/bar"},
@@ -82,11 +83,11 @@ func TestToDisk(t *testing.T) {
 	}
 
 	// Check the refs
-	checkRef := func(name string, r GitReference) {
-		actualRef := GitReference{}
+	checkRef := func(name string, r types.GitReference) {
+		actualRef := types.GitReference{}
 		readAndUnmarshal(t, filepath.Join(d, name), &actualRef)
 		if diff := cmp.Diff(actualRef, r); diff != "" {
-			t.Errorf("Get PullRequest: -want +got: %s", diff)
+			t.Errorf("Get types.PullRequest: -want +got: %s", diff)
 		}
 	}
 	checkRef("head.json", *tektonPr.Head)
@@ -98,9 +99,9 @@ func TestToDisk(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	statuses := map[string]Status{}
+	statuses := map[string]types.Status{}
 	for _, fi := range fis {
-		status := Status{}
+		status := types.Status{}
 		readAndUnmarshal(t, filepath.Join(d, "status", fi.Name()), &status)
 		statuses[status.ID] = status
 	}
@@ -119,7 +120,7 @@ func TestToDisk(t *testing.T) {
 		t.Fatal(err)
 	}
 	labels := map[string]struct{}{}
-	labelManifest := Manifest{}
+	labelManifest := types.Manifest{}
 	for _, fi := range fis {
 		if fi.Name() == manifestPath {
 			continue
@@ -156,13 +157,13 @@ func TestToDisk(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	comments := map[int64]Comment{}
-	commentManifest := Manifest{}
+	comments := map[int64]types.Comment{}
+	commentManifest := types.Manifest{}
 	for _, fi := range fis {
 		if fi.Name() == manifestPath {
 			continue
 		}
-		comment := Comment{}
+		comment := types.Comment{}
 		path := filepath.Join(d, "comments", fi.Name())
 		readAndUnmarshal(t, path, &comment)
 		comments[comment.ID] = comment
@@ -199,12 +200,12 @@ func TestFromDisk(t *testing.T) {
 	defer os.RemoveAll(d)
 
 	// Write some refs
-	base := GitReference{
+	base := types.GitReference{
 		Repo:   "repo1",
 		Branch: "branch1",
 		SHA:    "sha1",
 	}
-	head := GitReference{
+	head := types.GitReference{
 		Repo:   "repo2",
 		Branch: "branch2",
 		SHA:    "sha2",
@@ -222,16 +223,16 @@ func TestFromDisk(t *testing.T) {
 	writeFile(filepath.Join(d, "head.json"), &head)
 
 	// Write some statuses
-	statuses := []Status{
+	statuses := []types.Status{
 		{
 			ID:          "abc",
 			Description: "foo",
-			Code:        Success,
+			Code:        types.Success,
 		},
 		{
 			ID:          "def",
 			Description: "bar",
-			Code:        Failure,
+			Code:        types.Failure,
 		},
 	}
 
@@ -255,7 +256,7 @@ func TestFromDisk(t *testing.T) {
 	writeManifest(t, labels, filepath.Join(d, "labels", manifestPath))
 
 	// Write some comments
-	comments := []Comment{
+	comments := []types.Comment{
 		{
 			Text:   "testing",
 			Author: "me",
@@ -298,11 +299,11 @@ func TestFromDisk(t *testing.T) {
 	}
 
 	// Check the comments
-	commentMap := map[int64]Comment{}
+	commentMap := map[int64]types.Comment{}
 	for _, c := range comments {
 		commentMap[c.ID] = c
 	}
-	commentMap[0] = Comment{
+	commentMap[0] = types.Comment{
 		Text: "plaincomment",
 	}
 	for _, c := range pr.Comments {
@@ -310,7 +311,7 @@ func TestFromDisk(t *testing.T) {
 			t.Errorf("Get comments: -want +got: %s", diff)
 		}
 	}
-	commentManifest := Manifest{}
+	commentManifest := types.Manifest{}
 	for _, c := range comments {
 		commentManifest[strconv.FormatInt(c.ID, 10)] = true
 	}
@@ -329,7 +330,7 @@ func TestFromDisk(t *testing.T) {
 			t.Errorf("Get labels: -want +got: %s", diff)
 		}
 	}
-	labelManifest := Manifest{}
+	labelManifest := types.Manifest{}
 	for _, l := range labels {
 		labelManifest[l] = true
 	}
@@ -338,7 +339,7 @@ func TestFromDisk(t *testing.T) {
 	}
 
 	// Check the statuses
-	statusMap := map[string]Status{}
+	statusMap := map[string]types.Status{}
 	for _, s := range statuses {
 		statusMap[s.ID] = s
 	}
@@ -362,7 +363,7 @@ func readAndUnmarshal(t *testing.T, p string, v interface{}) {
 
 func Test_labelsToDisk(t *testing.T) {
 	type args struct {
-		labels []*Label
+		labels []*types.Label
 	}
 	tests := []struct {
 		name      string
@@ -372,7 +373,7 @@ func Test_labelsToDisk(t *testing.T) {
 		{
 			name: "single label",
 			args: args{
-				labels: []*Label{
+				labels: []*types.Label{
 					{Text: "foo"},
 				},
 			},
@@ -383,7 +384,7 @@ func Test_labelsToDisk(t *testing.T) {
 		{
 			name: "multiple labels",
 			args: args{
-				labels: []*Label{
+				labels: []*types.Label{
 					{Text: "foo"},
 					{Text: "bar"},
 				},
@@ -396,7 +397,7 @@ func Test_labelsToDisk(t *testing.T) {
 		{
 			name: "complex labels",
 			args: args{
-				labels: []*Label{
+				labels: []*types.Label{
 					{Text: "foo/bar"},
 					{Text: "help wanted"},
 					{Text: "simple"},
@@ -430,7 +431,7 @@ func Test_labelsToDisk(t *testing.T) {
 
 func Test_statusToDisk(t *testing.T) {
 	type args struct {
-		statuses []*Status
+		statuses []*types.Status
 	}
 	tests := []struct {
 		name      string
@@ -440,7 +441,7 @@ func Test_statusToDisk(t *testing.T) {
 		{
 			name: "single status",
 			args: args{
-				statuses: []*Status{
+				statuses: []*types.Status{
 					{ID: "foo"},
 				},
 			},
@@ -451,7 +452,7 @@ func Test_statusToDisk(t *testing.T) {
 		{
 			name: "multiple statuses",
 			args: args{
-				statuses: []*Status{
+				statuses: []*types.Status{
 					{ID: "foo"},
 					{ID: "bar"},
 				},
@@ -464,7 +465,7 @@ func Test_statusToDisk(t *testing.T) {
 		{
 			name: "complex statuses",
 			args: args{
-				statuses: []*Status{
+				statuses: []*types.Status{
 					{ID: "foo/bar"},
 					{ID: "help wanted"},
 					{ID: "simple"},
@@ -498,7 +499,7 @@ func Test_statusToDisk(t *testing.T) {
 
 func writeManifest(t *testing.T, items []string, path string) {
 	t.Helper()
-	m := Manifest{}
+	m := types.Manifest{}
 	for _, i := range items {
 		m[i] = true
 	}
@@ -514,14 +515,14 @@ func Test_labelsFromDisk(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want []Label
+		want []types.Label
 	}{
 		{
 			name: "single label",
 			args: args{
 				fileNames: []string{"foo"},
 			},
-			want: []Label{
+			want: []types.Label{
 				{Text: "foo"},
 			},
 		},
@@ -530,7 +531,7 @@ func Test_labelsFromDisk(t *testing.T) {
 			args: args{
 				fileNames: []string{"foo", "bar"},
 			},
-			want: []Label{
+			want: []types.Label{
 				{Text: "foo"},
 				{Text: "bar"},
 			},
@@ -540,7 +541,7 @@ func Test_labelsFromDisk(t *testing.T) {
 			args: args{
 				fileNames: []string{"foo%2Fbar", "bar+bat"},
 			},
-			want: []Label{
+			want: []types.Label{
 				{Text: "foo/bar"},
 				{Text: "bar bat"},
 			},
@@ -565,7 +566,7 @@ func Test_labelsFromDisk(t *testing.T) {
 				t.Errorf("labelsFromDisk() error = %v", err)
 			}
 
-			derefed := []Label{}
+			derefed := []types.Label{}
 			for _, l := range got {
 				derefed = append(derefed, *l)
 			}

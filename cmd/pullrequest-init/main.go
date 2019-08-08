@@ -18,7 +18,12 @@ package main
 import (
 	"context"
 	"flag"
+	"strings"
 
+	"github.com/tektoncd/pipeline/cmd/pullrequest-init/github"
+	"github.com/tektoncd/pipeline/cmd/pullrequest-init/gitlab"
+
+	"github.com/tektoncd/pipeline/cmd/pullrequest-init/types"
 	"knative.dev/pkg/logging"
 )
 
@@ -34,9 +39,21 @@ func main() {
 	defer logger.Sync()
 	ctx := context.Background()
 
-	client, err := NewGitHubHandler(ctx, logger, *prURL)
-	if err != nil {
-		logger.Fatalf("error creating GitHub client: %v", err)
+	var client types.PullRequester
+	var err error
+	switch url := *prURL; {
+	case strings.Contains(url, "github"):
+		client, err = github.NewHandler(ctx, logger, *prURL)
+		if err != nil {
+			logger.Fatalf("error creating GitHub client: %v", err)
+		}
+	case strings.Contains(url, "gitlab"):
+		client, err = gitlab.NewHandler(ctx, logger, *prURL)
+		if err != nil {
+			logger.Fatalf("error creating Gitlab client: %v", err)
+		}
+	default:
+		logger.Fatalf("unsupported pr url: %s", *prURL)
 	}
 
 	switch *mode {

@@ -1351,9 +1351,13 @@
     "github.com/mohae/deepcopy",
     "github.com/pkg/errors",
     "github.com/tektoncd/plumbing/scripts",
+<<<<<<< HEAD
     "go.opencensus.io/stats",
     "go.opencensus.io/stats/view",
     "go.opencensus.io/tag",
+=======
+    "github.com/xanzy/go-gitlab",
+>>>>>>> WIP
     "go.opencensus.io/trace",
     "go.uber.org/zap",
     "go.uber.org/zap/zaptest",

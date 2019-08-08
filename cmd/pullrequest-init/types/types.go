@@ -14,7 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package types
+
+import "context"
 
 // These are the generic resource types used for interacting with Pull Requests
 // and related resources. They should not be tied to any particular SCM system.
@@ -83,3 +85,13 @@ type Comment struct {
 type Label struct {
 	Text string
 }
+
+// PullRequester represents a type that can sync pull requests to disk
+type PullRequester interface {
+	Download(ctx context.Context, path string) (*PullRequest, error)
+	Upload(ctx context.Context, pr *PullRequest, manifests map[string]Manifest) error
+}
+
+// Manifest is a list of sub-resources that exist within the PR resource to
+// determine whether an item existed when the resource was initialized.
+type Manifest map[string]bool

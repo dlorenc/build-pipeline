@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package github
 
 import (
 	"context"
@@ -27,6 +27,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/tektoncd/pipeline/cmd/pullrequest-init/types"
+
 	"golang.org/x/oauth2"
 
 	"github.com/google/go-github/github"
@@ -34,31 +36,35 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	prFile = "pr.json"
+)
+
 var (
-	toGitHub = map[StatusCode]string{
-		Unknown: "error",
-		Success: "success",
-		Failure: "failure",
-		Error:   "error",
+	toGitHub = map[types.StatusCode]string{
+		types.Unknown: "error",
+		types.Success: "success",
+		types.Failure: "failure",
+		types.Error:   "error",
 		// There's no analog for neutral in GitHub statuses, so default to success
 		// to make this non-blocking.
-		Neutral:        "success",
-		Queued:         "pending",
-		InProgress:     "pending",
-		Timeout:        "error",
-		Canceled:       "error",
-		ActionRequired: "error",
+		types.Neutral:        "success",
+		types.Queued:         "pending",
+		types.InProgress:     "pending",
+		types.Timeout:        "error",
+		types.Canceled:       "error",
+		types.ActionRequired: "error",
 	}
-	toTekton = map[string]StatusCode{
-		"success": Success,
-		"failure": Failure,
-		"error":   Error,
-		"pending": Queued,
+	toTekton = map[string]types.StatusCode{
+		"success": types.Success,
+		"failure": types.Failure,
+		"error":   types.Error,
+		"pending": types.Queued,
 	}
 )
 
-// GitHubHandler handles interactions with the GitHub API.
-type GitHubHandler struct {
+// Handler handles interactions with the GitHub API.
+type Handler struct {
 	*github.Client
 
 	owner, repo string
@@ -67,10 +73,10 @@ type GitHubHandler struct {
 	Logger *zap.SugaredLogger
 }
 
-// NewGitHubHandler initializes a new handler for interacting with GitHub
+// NewHandler initializes a new handler for interacting with GitHub
 // resources.
-func NewGitHubHandler(ctx context.Context, logger *zap.SugaredLogger, rawURL string) (*GitHubHandler, error) {
-	token := strings.TrimSpace(os.Getenv("GITHUBTOKEN"))
+func NewHandler(ctx context.Context, logger *zap.SugaredLogger, rawURL string) (*Handler, error) {
+	token := strings.TrimSpace(os.Getenv("AUTHTOKEN"))
 	var hc *http.Client
 	if token != "" {
 		ts := oauth2.StaticTokenSource(
@@ -93,7 +99,7 @@ func NewGitHubHandler(ctx context.Context, logger *zap.SugaredLogger, rawURL str
 	} else {
 		client = github.NewClient(hc)
 	}
-	return &GitHubHandler{
+	return &Handler{
 		Client: client,
 		Logger: logger,
 		owner:  owner,
@@ -133,7 +139,7 @@ func writeJSON(path string, i interface{}) error {
 }
 
 // Download fetches and stores the desired pull request.
-func (h *GitHubHandler) Download(ctx context.Context, path string) (*PullRequest, error) {
+func (h *Handler) Download(ctx context.Context, path string) (*types.PullRequest, error) {
 	rawPrefix := filepath.Join(path, "github")
 	if err := os.MkdirAll(rawPrefix, 0755); err != nil {
 		return nil, err
@@ -168,16 +174,16 @@ func (h *GitHubHandler) Download(ctx context.Context, path string) (*PullRequest
 	return pr, nil
 }
 
-func baseGitHubPullRequest(pr *github.PullRequest) *PullRequest {
-	return &PullRequest{
+func baseGitHubPullRequest(pr *github.PullRequest) *types.PullRequest {
+	return &types.PullRequest{
 		Type: "github",
 		ID:   pr.GetID(),
-		Head: &GitReference{
+		Head: &types.GitReference{
 			Repo:   pr.GetHead().GetRepo().GetCloneURL(),
 			Branch: pr.GetHead().GetRef(),
 			SHA:    pr.GetHead().GetSHA(),
 		},
-		Base: &GitReference{
+		Base: &types.GitReference{
 			Repo:   pr.GetBase().GetRepo().GetCloneURL(),
 			Branch: pr.GetBase().GetRef(),
 			SHA:    pr.GetBase().GetSHA(),
@@ -186,17 +192,17 @@ func baseGitHubPullRequest(pr *github.PullRequest) *PullRequest {
 	}
 }
 
-func githubLabels(pr *github.PullRequest) []*Label {
-	labels := make([]*Label, 0, len(pr.Labels))
+func githubLabels(pr *github.PullRequest) []*types.Label {
+	labels := make([]*types.Label, 0, len(pr.Labels))
 	for _, l := range pr.Labels {
-		labels = append(labels, &Label{
+		labels = append(labels, &types.Label{
 			Text: l.GetName(),
 		})
 	}
 	return labels
 }
 
-func (h *GitHubHandler) downloadComments(ctx context.Context, rawPath string) ([]*Comment, error) {
+func (h *Handler) downloadComments(ctx context.Context, rawPath string) ([]*types.Comment, error) {
 	commentsPrefix := filepath.Join(rawPath, "comments")
 	for _, p := range []string{commentsPrefix} {
 		if err := os.MkdirAll(p, 0755); err != nil {
@@ -207,7 +213,7 @@ func (h *GitHubHandler) downloadComments(ctx context.Context, rawPath string) ([
 	if err != nil {
 		return nil, err
 	}
-	comments := make([]*Comment, 0, len(ic))
+	comments := make([]*types.Comment, 0, len(ic))
 	for _, c := range ic {
 		rawComment := filepath.Join(commentsPrefix, fmt.Sprintf("%d.json", c.GetID()))
 		h.Logger.Infof("Writing comment %d to file: %s", c.GetID(), rawComment)
@@ -215,7 +221,7 @@ func (h *GitHubHandler) downloadComments(ctx context.Context, rawPath string) ([
 			return nil, err
 		}
 
-		comment := &Comment{
+		comment := &types.Comment{
 			Author: c.GetUser().GetLogin(),
 			Text:   c.GetBody(),
 			ID:     c.GetID(),
@@ -239,8 +245,8 @@ func readJSON(path string, i interface{}) error {
 
 // Upload takes files stored on the filesystem and uploads new changes to
 // GitHub.
-func (h *GitHubHandler) Upload(ctx context.Context, pr *PullRequest, manifests map[string]Manifest) error {
-	h.Logger.Infof("Syncing path: %+v to pr %d", pr, h.prNum)
+func (h *Handler) Upload(ctx context.Context, pr *types.PullRequest, manifests map[string]types.Manifest) error {
+	h.Logger.Infof("Syncing path: %s to pr %d", pr, h.prNum)
 
 	// TODO: Allow syncing from GitHub specific sources.
 	var merr error
@@ -260,9 +266,7 @@ func (h *GitHubHandler) Upload(ctx context.Context, pr *PullRequest, manifests m
 	return merr
 }
 
-func (h *GitHubHandler) uploadLabels(ctx context.Context, manifest Manifest, raw []*Label) error {
-	// Convert requested labels to a map. This ensures that there are no
-	// duplicates and makes it easier to query which labels are being requested.
+func (h *Handler) uploadLabels(ctx context.Context, manifest types.Manifest, raw []*types.Label) error {
 	labels := make(map[string]bool)
 	for _, l := range raw {
 		labels[l.Text] = true
@@ -308,13 +312,13 @@ func (h *GitHubHandler) uploadLabels(ctx context.Context, manifest Manifest, raw
 	return err
 }
 
-func (h *GitHubHandler) uploadComments(ctx context.Context, manifest Manifest, comments []*Comment) error {
+func (h *Handler) uploadComments(ctx context.Context, manifest types.Manifest, comments []*types.Comment) error {
 	h.Logger.Infof("Setting comments for PR %d to: %v", h.prNum, comments)
 
 	// Sort comments into whether they are new or existing comments (based on
 	// whether there is an ID defined).
-	existingComments := map[int64]*Comment{}
-	newComments := []*Comment{}
+	existingComments := map[int64]*types.Comment{}
+	newComments := []*types.Comment{}
 	for _, c := range comments {
 		if c.ID != 0 {
 			existingComments[c.ID] = c
@@ -335,7 +339,7 @@ func (h *GitHubHandler) uploadComments(ctx context.Context, manifest Manifest, c
 	return merr
 }
 
-func (h *GitHubHandler) updateExistingComments(ctx context.Context, manifest Manifest, comments map[int64]*Comment) error {
+func (h *Handler) updateExistingComments(ctx context.Context, manifest types.Manifest, comments map[int64]*types.Comment) error {
 	currentComments, _, err := h.Issues.ListComments(ctx, h.owner, h.repo, h.prNum, nil)
 	if err != nil {
 		return err
@@ -382,7 +386,7 @@ func (h *GitHubHandler) updateExistingComments(ctx context.Context, manifest Man
 	return merr
 }
 
-func (h *GitHubHandler) createNewComments(ctx context.Context, comments []*Comment) error {
+func (h *Handler) createNewComments(ctx context.Context, comments []*types.Comment) error {
 	var merr error
 	for _, dc := range comments {
 		c := &github.IssueComment{
@@ -397,7 +401,7 @@ func (h *GitHubHandler) createNewComments(ctx context.Context, comments []*Comme
 	return merr
 }
 
-func (h *GitHubHandler) getStatuses(ctx context.Context, sha string, path string) ([]*Status, error) {
+func (h *Handler) getStatuses(ctx context.Context, sha string, path string) ([]*types.Status, error) {
 	resp, _, err := h.Repositories.GetCombinedStatus(ctx, h.owner, h.repo, sha, nil)
 	if err != nil {
 		return nil, err
@@ -406,13 +410,13 @@ func (h *GitHubHandler) getStatuses(ctx context.Context, sha string, path string
 		return nil, err
 	}
 
-	statuses := make([]*Status, 0, len(resp.Statuses))
+	statuses := make([]*types.Status, 0, len(resp.Statuses))
 	for _, s := range resp.Statuses {
 		code, ok := toTekton[s.GetState()]
 		if !ok {
 			return nil, fmt.Errorf("unknown GitHub status state: %s", s.GetState())
 		}
-		statuses = append(statuses, &Status{
+		statuses = append(statuses, &types.Status{
 			ID:          s.GetContext(),
 			Code:        code,
 			Description: s.GetDescription(),
@@ -422,7 +426,7 @@ func (h *GitHubHandler) getStatuses(ctx context.Context, sha string, path string
 	return statuses, nil
 }
 
-func (h *GitHubHandler) uploadStatuses(ctx context.Context, sha string, statuses []*Status) error {
+func (h *Handler) uploadStatuses(ctx context.Context, sha string, statuses []*types.Status) error {
 	var merr error
 
 	for _, s := range statuses {

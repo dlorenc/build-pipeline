@@ -25,8 +25,8 @@ import (
 )
 
 const (
-	prSource       = "pr-source"
-	githubTokenEnv = "githubToken"
+	prSource     = "pr-source"
+	authTokenEnv = "authToken"
 )
 
 // PullRequestResource is an endpoint from which to get data which is required
@@ -107,7 +107,7 @@ func (s *PullRequestResource) getSteps(mode string, sourcePath string) []Step {
 
 	evs := []corev1.EnvVar{}
 	for _, sec := range s.Secrets {
-		if strings.EqualFold(sec.FieldName, githubTokenEnv) {
+		if strings.EqualFold(sec.FieldName, authTokenEnv) {
 			ev := corev1.EnvVar{
 				Name: strings.ToUpper(sec.FieldName),
 				ValueFrom: &corev1.EnvVarSource{

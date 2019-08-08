@@ -24,6 +24,8 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+
+	"github.com/tektoncd/pipeline/cmd/pullrequest-init/types"
 )
 
 // This file contains functions used to write a PR to disk. The representation is as follows:
@@ -46,7 +48,7 @@ const (
 )
 
 // ToDisk converts a PullRequest object to an on-disk representation at the specified path.
-func ToDisk(pr *PullRequest, path string) error {
+func ToDisk(pr *types.PullRequest, path string) error {
 	labelsPath := filepath.Join(path, "labels")
 	commentsPath := filepath.Join(path, "comments")
 	statusesPath := filepath.Join(path, "status")
@@ -84,8 +86,8 @@ func ToDisk(pr *PullRequest, path string) error {
 	return nil
 }
 
-func commentsToDisk(path string, comments []*Comment) error {
-	manifest := Manifest{}
+func commentsToDisk(path string, comments []*types.Comment) error {
+	manifest := types.Manifest{}
 	for _, c := range comments {
 		id := strconv.FormatInt(c.ID, 10)
 		commentPath := filepath.Join(path, id+".json")
@@ -106,8 +108,8 @@ func commentsToDisk(path string, comments []*Comment) error {
 	return manifestToDisk(manifest, filepath.Join(path, manifestPath))
 }
 
-func labelsToDisk(path string, labels []*Label) error {
-	manifest := Manifest{}
+func labelsToDisk(path string, labels []*types.Label) error {
+	manifest := types.Manifest{}
 	for _, l := range labels {
 		name := url.QueryEscape(l.Text)
 		labelPath := filepath.Join(path, name)
@@ -119,7 +121,7 @@ func labelsToDisk(path string, labels []*Label) error {
 	return manifestToDisk(manifest, filepath.Join(path, manifestPath))
 }
 
-func statusToDisk(path string, statuses []*Status) error {
+func statusToDisk(path string, statuses []*types.Status) error {
 	for _, s := range statuses {
 		statusName := url.QueryEscape(s.ID) + ".json"
 		statusPath := filepath.Join(path, statusName)
@@ -134,7 +136,7 @@ func statusToDisk(path string, statuses []*Status) error {
 	return nil
 }
 
-func refToDisk(name, path string, r *GitReference) error {
+func refToDisk(name, path string, r *types.GitReference) error {
 	b, err := json.Marshal(r)
 	if err != nil {
 		return err
@@ -143,16 +145,16 @@ func refToDisk(name, path string, r *GitReference) error {
 }
 
 // FromDisk outputs a PullRequest object from an on-disk representation at the specified path.
-func FromDisk(path string) (*PullRequest, map[string]Manifest, error) {
+func FromDisk(path string) (*types.PullRequest, map[string]types.Manifest, error) {
 	labelsPath := filepath.Join(path, "labels")
 	commentsPath := filepath.Join(path, "comments")
 	statusesPath := filepath.Join(path, "status")
 
-	pr := PullRequest{}
-	manifests := make(map[string]Manifest)
+	manifests := make(map[string]types.Manifest)
+	pr := types.PullRequest{}
 
 	var err error
-	var manifest Manifest
+	var manifest types.Manifest
 
 	pr.Comments, manifest, err = commentsFromDisk(commentsPath)
 	if err != nil {
@@ -182,11 +184,7 @@ func FromDisk(path string) (*PullRequest, map[string]Manifest, error) {
 	return &pr, manifests, nil
 }
 
-// Manifest is a list of sub-resources that exist within the PR resource to
-// determine whether an item existed when the resource was initialized.
-type Manifest map[string]bool
-
-func manifestToDisk(manifest Manifest, path string) error {
+func manifestToDisk(manifest types.Manifest, path string) error {
 	f, err := os.Create(path)
 	if err != nil {
 		return err
@@ -196,14 +194,14 @@ func manifestToDisk(manifest Manifest, path string) error {
 	return enc.Encode(manifest)
 }
 
-func manifestFromDisk(path string) (Manifest, error) {
+func manifestFromDisk(path string) (types.Manifest, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
 
-	m := Manifest{}
+	m := types.Manifest{}
 	dec := gob.NewDecoder(f)
 	if err := dec.Decode(&m); err != nil {
 		return nil, err
@@ -211,12 +209,12 @@ func manifestFromDisk(path string) (Manifest, error) {
 	return m, nil
 }
 
-func commentsFromDisk(path string) ([]*Comment, Manifest, error) {
+func commentsFromDisk(path string) ([]*types.Comment, types.Manifest, error) {
 	fis, err := ioutil.ReadDir(path)
 	if err != nil {
 		return nil, nil, err
 	}
-	comments := []*Comment{}
+	comments := []*types.Comment{}
 	for _, fi := range fis {
 		if fi.Name() == manifestPath {
 			continue
@@ -225,7 +223,7 @@ func commentsFromDisk(path string) ([]*Comment, Manifest, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		comment := Comment{}
+		comment := types.Comment{}
 		if err := json.Unmarshal(b, &comment); err != nil {
 			// The comment might be plain text.
 			comment.Text = string(b)
@@ -241,12 +239,12 @@ func commentsFromDisk(path string) ([]*Comment, Manifest, error) {
 	return comments, manifest, nil
 }
 
-func labelsFromDisk(path string) ([]*Label, Manifest, error) {
+func labelsFromDisk(path string) ([]*types.Label, types.Manifest, error) {
 	fis, err := ioutil.ReadDir(path)
 	if err != nil {
 		return nil, nil, err
 	}
-	labels := []*Label{}
+	labels := []*types.Label{}
 	for _, fi := range fis {
 		if fi.Name() == manifestPath {
 			continue
@@ -255,7 +253,7 @@ func labelsFromDisk(path string) ([]*Label, Manifest, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		labels = append(labels, &Label{Text: text})
+		labels = append(labels, &types.Label{Text: text})
 	}
 
 	manifest, err := manifestFromDisk(filepath.Join(path, manifestPath))
@@ -266,19 +264,19 @@ func labelsFromDisk(path string) ([]*Label, Manifest, error) {
 	return labels, manifest, nil
 }
 
-func statusesFromDisk(path string) ([]*Status, error) {
+func statusesFromDisk(path string) ([]*types.Status, error) {
 	fis, err := ioutil.ReadDir(path)
 	if err != nil {
 		return nil, err
 	}
 
-	statuses := []*Status{}
+	statuses := []*types.Status{}
 	for _, fi := range fis {
 		b, err := ioutil.ReadFile(filepath.Join(path, fi.Name()))
 		if err != nil {
 			return nil, err
 		}
-		status := Status{}
+		status := types.Status{}
 		if err := json.Unmarshal(b, &status); err != nil {
 			return nil, err
 		}
@@ -287,12 +285,12 @@ func statusesFromDisk(path string) ([]*Status, error) {
 	return statuses, nil
 }
 
-func refFromDisk(path, name string) (*GitReference, error) {
+func refFromDisk(path, name string) (*types.GitReference, error) {
 	b, err := ioutil.ReadFile(filepath.Join(path, name))
 	if err != nil {
 		return nil, err
 	}
-	ref := GitReference{}
+	ref := types.GitReference{}
 	if err := json.Unmarshal(b, &ref); err != nil {
 		return nil, err
 	}

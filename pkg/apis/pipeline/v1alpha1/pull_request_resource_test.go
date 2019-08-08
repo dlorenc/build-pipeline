@@ -32,7 +32,7 @@ func TestPullRequest_NewResource(t *testing.T) {
 		v1alpha1.PipelineResourceTypePullRequest,
 		tb.PipelineResourceSpecParam("type", "github"),
 		tb.PipelineResourceSpecParam("url", url),
-		tb.PipelineResourceSpecSecretParam("githubToken", "test-secret-key", "test-secret-name"),
+		tb.PipelineResourceSpecSecretParam("authToken", "test-secret-key", "test-secret-name"),
 	))
 	got, err := v1alpha1.NewPullRequestResource("override-with-pr:latest", pr)
 	if err != nil {
@@ -85,7 +85,7 @@ func containerTestCases(mode string) []testcase {
 			Name: "creds",
 			URL:  "https://example.com",
 			Secrets: []v1alpha1.SecretParam{{
-				FieldName:  "githubToken",
+				FieldName:  "authToken",
 				SecretName: "github-creds",
 				SecretKey:  "token",
 			}},
@@ -98,7 +98,7 @@ func containerTestCases(mode string) []testcase {
 			Command:    []string{"/ko-app/pullrequest-init"},
 			Args:       []string{"-url", "https://example.com", "-path", "/workspace", "-mode", mode},
 			Env: []corev1.EnvVar{{
-				Name: "GITHUBTOKEN",
+				Name: "AUTHTOKEN",
 				ValueFrom: &corev1.EnvVarSource{
 					SecretKeyRef: &corev1.SecretKeySelector{
 						LocalObjectReference: corev1.LocalObjectReference{
