@@ -54,7 +54,7 @@ func AddOutputResources(
 	taskName string,
 	taskSpec *v1alpha1.TaskSpec,
 	taskRun *v1alpha1.TaskRun,
-	outputResources map[string]v1alpha1.PipelineResourceInterface,
+	outputResources map[string]v1alpha1.OutputPipelineResourceInterface,
 	logger *zap.SugaredLogger,
 ) (*v1alpha1.TaskSpec, error) {
 

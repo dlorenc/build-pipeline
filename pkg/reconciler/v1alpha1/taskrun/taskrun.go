@@ -436,13 +436,27 @@ func (c *Reconciler) createPod(tr *v1alpha1.TaskRun, rtr *resources.ResolvedTask
 		return nil, err
 	}
 
-	ts, err = resources.AddInputResource(c.KubeClientSet, rtr.TaskName, ts, tr, inputResources, c.Logger)
+	inputInterfaces := map[string]v1alpha1.InputPipelineResourceInterface{}
+	for k, v := range inputResources {
+		i, ok := v.(v1alpha1.InputPipelineResourceInterface)
+		if !ok {
+			c.Logger.Errorf("Failed to convert resource to Input type: %s", k)
+			return nil, err
+		}
+		inputInterfaces[k] = i
+	}
+
+	ts, err = resources.AddInputResource(c.KubeClientSet, rtr.TaskName, ts, tr, inputInterfaces, c.Logger)
 	if err != nil {
 		c.Logger.Errorf("Failed to create a build for taskrun: %s due to input resource error %v", tr.Name, err)
 		return nil, err
 	}
 
-	ts, err = resources.AddOutputResources(c.KubeClientSet, rtr.TaskName, ts, tr, outputResources, c.Logger)
+	outputInterfaces := map[string]v1alpha1.OutputPipelineResourceInterface{}
+	for k, v := range inputResources {
+		outputInterfaces[k] = v.(v1alpha1.OutputPipelineResourceInterface)
+	}
+	ts, err = resources.AddOutputResources(c.KubeClientSet, rtr.TaskName, ts, tr, outputInterfaces, c.Logger)
 	if err != nil {
 		c.Logger.Errorf("Failed to create a build for taskrun: %s due to output resource error %v", tr.Name, err)
 		return nil, err

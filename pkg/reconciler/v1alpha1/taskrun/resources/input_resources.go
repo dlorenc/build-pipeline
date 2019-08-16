@@ -49,7 +49,7 @@ func AddInputResource(
 	taskName string,
 	taskSpec *v1alpha1.TaskSpec,
 	taskRun *v1alpha1.TaskRun,
-	inputResources map[string]v1alpha1.PipelineResourceInterface,
+	inputResources map[string]v1alpha1.InputPipelineResourceInterface,
 	logger *zap.SugaredLogger,
 ) (*v1alpha1.TaskSpec, error) {
 

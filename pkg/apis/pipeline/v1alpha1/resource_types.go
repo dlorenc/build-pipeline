@@ -51,15 +51,25 @@ const (
 // AllResourceTypes can be used for validation to check if a provided Resource type is one of the known types.
 var AllResourceTypes = []PipelineResourceType{PipelineResourceTypeGit, PipelineResourceTypeStorage, PipelineResourceTypeImage, PipelineResourceTypeCluster, PipelineResourceTypePullRequest, PipelineResourceTypeCloudEvent}
 
+// InputPipelineResourceInterface interface to be implemented by different types that can act as inputs.
+type InputPipelineResourceInterface interface {
+	GetDownloadSteps(sourcePath string) ([]Step, error)
+	GetDownloadVolumeSpec(spec *TaskSpec) ([]corev1.Volume, error)
+	PipelineResourceInterface
+}
+
+// OutputPipelineResourceInterface interface to be implemented by different types that can act as outputs.
+type OutputPipelineResourceInterface interface {
+	GetUploadSteps(sourcePath string) ([]Step, error)
+	GetUploadVolumeSpec(spec *TaskSpec) ([]corev1.Volume, error)
+	PipelineResourceInterface
+}
+
 // PipelineResourceInterface interface to be implemented by different PipelineResource types
 type PipelineResourceInterface interface {
 	GetName() string
 	GetType() PipelineResourceType
 	Replacements() map[string]string
-	GetDownloadSteps(sourcePath string) ([]Step, error)
-	GetUploadSteps(sourcePath string) ([]Step, error)
-	GetUploadVolumeSpec(spec *TaskSpec) ([]corev1.Volume, error)
-	GetDownloadVolumeSpec(spec *TaskSpec) ([]corev1.Volume, error)
 }
 
 // SecretParam indicates which secret can be used to populate a field of the resource
