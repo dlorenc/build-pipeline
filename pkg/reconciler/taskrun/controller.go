@@ -29,6 +29,7 @@ import (
 	resourceinformer "github.com/tektoncd/pipeline/pkg/client/resource/injection/informers/resource/v1alpha1/pipelineresource"
 	"github.com/tektoncd/pipeline/pkg/pod"
 	"github.com/tektoncd/pipeline/pkg/reconciler"
+	"github.com/tektoncd/pipeline/pkg/reconciler/signing"
 	cloudeventclient "github.com/tektoncd/pipeline/pkg/reconciler/taskrun/resources/cloudevent"
 	"github.com/tektoncd/pipeline/pkg/reconciler/volumeclaim"
 	"k8s.io/client-go/tools/cache"
@@ -86,6 +87,10 @@ func NewController(images pipeline.Images) func(context.Context, configmap.Watch
 			metrics:           metrics,
 			entrypointCache:   entrypointCache,
 			pvcHandler:        volumeclaim.NewPVCHandler(kubeclientset, logger),
+		}
+		c.signer, err = signing.NewSigner()
+		if err != nil {
+			logger.Errorf("Error creating signer: %v", err)
 		}
 		impl := controller.NewImpl(c, c.Logger, pipeline.TaskRunControllerName)
 

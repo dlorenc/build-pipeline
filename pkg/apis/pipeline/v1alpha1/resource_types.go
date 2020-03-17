@@ -21,6 +21,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
+	"github.com/tektoncd/pipeline/pkg/reconciler/signing"
+	"go.uber.org/zap"
 )
 
 // PipelineResourceInterface interface to be implemented by different PipelineResource types
@@ -38,6 +40,10 @@ type PipelineResourceInterface interface {
 	// GetInputTaskModifier returns the TaskModifier instance that should be used on a Task
 	// in order to add this kind of resource when it is being used as an input.
 	GetInputTaskModifier(ts *TaskSpec, path string) (TaskModifier, error)
+}
+
+type Signable interface {
+	AttachSignature(*signing.Signer, *TaskRun, *zap.SugaredLogger) error
 }
 
 // TaskModifier is an interface to be implemented by different PipelineResources

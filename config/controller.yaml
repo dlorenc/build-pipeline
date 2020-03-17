@@ -12,6 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+apiVersion: v1
+kind: Secret
+metadata:
+  name: signing-secrets
+  namespace: tekton-pipelines
+  labels:
+    pipeline.tekton.dev/release: devel
+# The data is populated at install time.
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -62,6 +72,8 @@ spec:
         volumeMounts:
         - name: config-logging
           mountPath: /etc/config-logging
+        - name: config-signing
+          mountPath: /etc/config-signing
         env:
         - name: SYSTEM_NAMESPACE
           valueFrom:
@@ -88,6 +100,9 @@ spec:
         - name: config-logging
           configMap:
             name: config-logging
+        - name: config-signing
+          secret:
+            secretName: signing-secrets
 ---
 apiVersion: v1
 kind: Service

@@ -18,6 +18,8 @@ package taskrun
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -34,6 +36,7 @@ import (
 	"github.com/tektoncd/pipeline/pkg/contexts"
 	podconvert "github.com/tektoncd/pipeline/pkg/pod"
 	"github.com/tektoncd/pipeline/pkg/reconciler"
+	"github.com/tektoncd/pipeline/pkg/reconciler/signing"
 	"github.com/tektoncd/pipeline/pkg/reconciler/taskrun/resources"
 	"github.com/tektoncd/pipeline/pkg/reconciler/taskrun/resources/cloudevent"
 	"github.com/tektoncd/pipeline/pkg/reconciler/volumeclaim"
@@ -70,6 +73,7 @@ type Reconciler struct {
 	timeoutHandler    *reconciler.TimeoutSet
 	metrics           *Recorder
 	pvcHandler        volumeclaim.PvcHandler
+	signer            *signing.Signer
 }
 
 // Check that our Reconciler implements controller.Reconciler
@@ -227,6 +231,29 @@ func (c *Reconciler) getTaskResolver(tr *v1beta1.TaskRun) (*resources.LocalTaskR
 	}
 	resolver.Kind = kind
 	return resolver, kind
+}
+
+func (c *Reconciler) signTaskRun(tr *v1alpha1.TaskRun) ([]byte, error) {
+	if c.signer == nil {
+		c.Logger.Debug("Not signing taskrun, signer is not configured")
+		return nil, nil
+	}
+	signature, err := c.signer.Sign(tr)
+	if err != nil {
+		return nil, err
+	}
+	b, _ := json.Marshal(tr)
+	if tr.Annotations == nil {
+		tr.Annotations = map[string]string{}
+	}
+	tr.Annotations["body"] = base64.StdEncoding.EncodeToString(b)
+	tr.Annotations["signature"] = string(signature)
+
+	if _, err := c.updateLabelsAndAnnotations(tr); err != nil {
+		return nil, err
+	}
+
+	return signature, nil
 }
 
 // `prepare` fetches resources the taskrun depends on, runs validation and convertion
@@ -402,13 +429,44 @@ func (c *Reconciler) reconcile(ctx context.Context, tr *v1beta1.TaskRun,
 	}
 
 	// Convert the Pod's status to the equivalent TaskRun Status.
+	before := tr.Status.GetCondition(apis.ConditionSucceeded)
 	tr.Status = podconvert.MakeTaskRunStatus(c.Logger, *tr, pod, *taskSpec)
+	after := tr.Status.GetCondition(apis.ConditionSucceeded)
 
 	if err := updateTaskRunResourceResult(tr, pod.Status); err != nil {
 		return err
 	}
 
 	c.Logger.Infof("Successfully reconciled taskrun %s/%s with status: %#v", tr.Name, tr.Namespace, tr.Status.GetCondition(apis.ConditionSucceeded))
+
+	if tr.IsDone() && (before != after) {
+
+		signature, err := c.signTaskRun(tr)
+		if err != nil {
+			c.Logger.Warnf("error signing taskrun %s: %s", tr.Name, err)
+			return nil
+		}
+		c.Logger.Infof("Signed tr: %s %s", tr.GetName(), string(signature))
+		if c.signer != nil {
+			// Now attach signatures to the artifacts
+			for _, r := range rtr.Outputs {
+				pr, err := resource.FromType(r, c.Images)
+				if err != nil {
+					c.Logger.Warnf("error attaching signature to resource %q taskrun %q: %s", pr, tr, err)
+					continue
+				}
+				c.Logger.Infof("Checking if pr %s is signable", pr.GetName())
+				if signable, ok := pr.(v1alpha1.Signable); ok {
+					if err := signable.AttachSignature(c.signer, tr, c.Logger); err != nil {
+						c.Logger.Errorf("error attachingg signature to resource: %v", err)
+					}
+				} else {
+					c.Logger.Infof("pr %s is not signable", pr.GetName())
+				}
+			}
+		}
+	}
+
 	return nil
 }
 
