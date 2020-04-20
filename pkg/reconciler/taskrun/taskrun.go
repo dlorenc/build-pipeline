@@ -260,6 +260,11 @@ func (c *Reconciler) prepare(ctx context.Context, tr *v1beta1.TaskRun) (*v1beta1
 		c.Logger.Errorf("Failed to store TaskSpec on TaskRun.Statusfor taskrun %s: %v", tr.Name, err)
 	}
 
+	// Store the fetched TaskSpec on the TaskRun for auditing
+	if err := storeTaskSpec(ctx, tr, taskSpec); err != nil {
+		c.Logger.Errorf("Failed to store TaskSpec on TaskRun.Statusfor taskrun %s: %v", tr.Name, err)
+	}
+
 	// Propagate labels from Task to TaskRun.
 	if tr.ObjectMeta.Labels == nil {
 		tr.ObjectMeta.Labels = make(map[string]string, len(taskMeta.Labels)+1)

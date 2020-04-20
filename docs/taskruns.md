@@ -320,6 +320,8 @@ status in the `steps.results` field using the following command, where `<name>` 
 
 The exact Task Spec used to instantiate the TaskRun is also included in the Status for full auditability.
 
+The exact Task Spec used to instantiate the TaskRun is also included in the Status for full auditability.
+
 ### Steps
 
 The corresponding statuses appear in the `status.steps` list in the order in which the `Steps` have been
