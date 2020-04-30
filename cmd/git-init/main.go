@@ -60,8 +60,9 @@ func main() {
 	resourceName := os.Getenv("TEKTON_RESOURCE_NAME")
 	output := []v1beta1.PipelineResourceResult{
 		{
-			Key:   "commit",
-			Value: commit,
+			Key:          "commit",
+			Value:        commit,
+			ResourceName: resourceName,
 			ResourceRef: v1beta1.PipelineResourceRef{
 				Name: resourceName,
 			},

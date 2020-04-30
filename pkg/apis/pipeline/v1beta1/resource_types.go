@@ -120,10 +120,11 @@ type PipelineResourceBinding struct {
 
 // PipelineResourceResult used to export the image name and digest as json
 type PipelineResourceResult struct {
-	Key         string              `json:"key"`
-	Value       string              `json:"value"`
-	ResourceRef PipelineResourceRef `json:"resourceRef,omitempty"`
-	ResultType  ResultType          `json:"type,omitempty"`
+	Key          string              `json:"key"`
+	Value        string              `json:"value"`
+	ResourceRef  PipelineResourceRef `json:"resourceRef,omitempty"`
+	ResultType   ResultType          `json:"type,omitempty"`
+	ResourceName string              `json:"resourceName,omitempty"`
 }
 
 // ResultType used to find out whether a PipelineResourceResult is from a task result or not

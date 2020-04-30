@@ -19,12 +19,13 @@ package taskrun
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/in-toto/in-toto-golang/in_toto"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline"
@@ -233,20 +234,20 @@ func (c *Reconciler) getTaskResolver(tr *v1beta1.TaskRun) (*resources.LocalTaskR
 	return resolver, kind
 }
 
-func (c *Reconciler) signTaskRun(tr *v1alpha1.TaskRun) ([]byte, error) {
+func (c *Reconciler) signTaskRun(tr *v1alpha1.TaskRun, rtr *resources.ResolvedTaskResources) ([]byte, error) {
 	if c.signer == nil {
 		c.Logger.Debug("Not signing taskrun, signer is not configured")
 		return nil, nil
 	}
-	signature, err := c.signer.Sign(tr)
+	payload := createPayload(tr, rtr)
+	signature, body, err := c.signer.Sign(payload)
 	if err != nil {
 		return nil, err
 	}
-	b, _ := json.Marshal(tr)
 	if tr.Annotations == nil {
 		tr.Annotations = map[string]string{}
 	}
-	tr.Annotations["body"] = base64.StdEncoding.EncodeToString(b)
+	tr.Annotations["body"] = base64.StdEncoding.EncodeToString(body)
 	tr.Annotations["signature"] = string(signature)
 
 	if _, err := c.updateLabelsAndAnnotations(tr); err != nil {
@@ -254,6 +255,35 @@ func (c *Reconciler) signTaskRun(tr *v1alpha1.TaskRun) ([]byte, error) {
 	}
 
 	return signature, nil
+}
+
+func createPayload(tr *v1alpha1.TaskRun, rtr *resources.ResolvedTaskResources) in_toto.Link {
+	l := in_toto.Link{
+		Type: "_link",
+	}
+
+	l.Materials = map[string]interface{}{}
+	for _, r := range tr.Spec.Resources.Inputs {
+		for _, rr := range tr.Status.ResourcesResult {
+			if r.Name == rr.ResourceName {
+				l.Materials[rr.ResourceName] = rr
+			}
+		}
+	}
+
+	l.Products = map[string]interface{}{}
+	for _, r := range tr.Spec.Resources.Outputs {
+		for _, rr := range tr.Status.ResourcesResult {
+			if r.Name == rr.ResourceName {
+				l.Products[rr.ResourceName] = rr
+			}
+		}
+	}
+
+	l.Environment = map[string]interface{}{}
+	// Add Tekton release info here
+	l.Environment["tekton"] = tr.Status
+	return l
 }
 
 // `prepare` fetches resources the taskrun depends on, runs validation and convertion
@@ -441,7 +471,7 @@ func (c *Reconciler) reconcile(ctx context.Context, tr *v1beta1.TaskRun,
 
 	if tr.IsDone() && (before != after) {
 
-		signature, err := c.signTaskRun(tr)
+		signature, err := c.signTaskRun(tr, rtr)
 		if err != nil {
 			c.Logger.Warnf("error signing taskrun %s: %s", tr.Name, err)
 			return nil
@@ -449,8 +479,8 @@ func (c *Reconciler) reconcile(ctx context.Context, tr *v1beta1.TaskRun,
 		c.Logger.Infof("Signed tr: %s %s", tr.GetName(), string(signature))
 		if c.signer != nil {
 			// Now attach signatures to the artifacts
-			for _, r := range rtr.Outputs {
-				pr, err := resource.FromType(r, c.Images)
+			for rname, r := range rtr.Outputs {
+				pr, err := resource.FromType(rname, r, c.Images)
 				if err != nil {
 					c.Logger.Warnf("error attaching signature to resource %q taskrun %q: %s", pr, tr, err)
 					continue
@@ -713,7 +743,7 @@ func isExceededResourceQuotaError(err error) bool {
 func resourceImplBinding(resources map[string]*resourcev1alpha1.PipelineResource, images pipeline.Images) (map[string]v1beta1.PipelineResourceInterface, error) {
 	p := make(map[string]v1beta1.PipelineResourceInterface)
 	for rName, r := range resources {
-		i, err := resource.FromType(r, images)
+		i, err := resource.FromType(rName, r, images)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create resource %s : %v with error: %w", rName, r, err)
 		}

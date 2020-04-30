@@ -44,14 +44,14 @@ func NewSigner() (*Signer, error) {
 	return s, nil
 }
 
-func (s *Signer) Sign(i interface{}) ([]byte, error) {
+func (s *Signer) Sign(i interface{}) ([]byte, []byte, error) {
 	b, err := json.Marshal(i)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	signature := bytes.Buffer{}
 	if err := openpgp.ArmoredDetachSignText(&signature, s.key, bytes.NewReader(b), nil); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return signature.Bytes(), nil
+	return signature.Bytes(), b, nil
 }

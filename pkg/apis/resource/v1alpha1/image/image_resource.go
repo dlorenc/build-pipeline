@@ -50,12 +50,12 @@ type Resource struct {
 }
 
 // NewResource creates a new ImageResource from a PipelineResourcev1alpha1.
-func NewResource(r *resourcev1alpha1.PipelineResource) (*Resource, error) {
+func NewResource(name string, r *resourcev1alpha1.PipelineResource) (*Resource, error) {
 	if r.Spec.Type != resourcev1alpha1.PipelineResourceTypeImage {
 		return nil, fmt.Errorf("ImageResource: Cannot create an Image resource from a %s Pipeline Resource", r.Spec.Type)
 	}
 	ir := &Resource{
-		Name: r.Name,
+		Name: name,
 		Type: resourcev1alpha1.PipelineResourceTypeImage,
 	}
 
@@ -127,9 +127,19 @@ func (s Resource) AttachSignature(signer *signing.Signer, tr *pipelinev1alpha1.T
 	}
 
 	sig := SimpleSigning{
-		Digest:     rrs["digest"],
-		Builder:    fmt.Sprintf("Tekton %s", version.PipelineVersion),
-		Provenance: tr,
+		Critical: Critical{
+			Identity: Identity{
+				DockerReference: s.URL,
+			},
+			Image: Image{
+				DockerManifestDigest: rrs["digest"],
+			},
+			Type: "Tekton builder signature",
+		},
+		Optional: map[string]interface{}{
+			"builder":    fmt.Sprintf("Tekton %s", version.PipelineVersion),
+			"provenance": tr.Status,
+		},
 	}
 
 	body, err := json.Marshal(sig)
@@ -139,7 +149,7 @@ func (s Resource) AttachSignature(signer *signing.Signer, tr *pipelinev1alpha1.T
 
 	l.Infof("Attaching signature %s to image %s", string(body), s.Name)
 
-	signature, err := signer.Sign(sig)
+	signature, _, err := signer.Sign(sig)
 	if err != nil {
 		return err
 	}
@@ -198,10 +208,23 @@ func (s Resource) AttachSignature(signer *signing.Signer, tr *pipelinev1alpha1.T
 	return nil
 }
 
+type Critical struct {
+	Identity Identity `json:"identity`
+	Image    Image    `json:"image"`
+	Type     string   `json:"type"`
+}
+
+type Identity struct {
+	DockerReference string `json:"docker-reference"`
+}
+
+type Image struct {
+	DockerManifestDigest string `json:"Docker-manifest-digest"`
+}
+
 type SimpleSigning struct {
-	Digest     string
-	Builder    string
-	Provenance interface{}
+	Critical Critical
+	Optional map[string]interface{}
 }
 
 type MySignature struct {

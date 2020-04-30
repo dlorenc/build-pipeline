@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1alpha1"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"github.com/tektoncd/pipeline/pkg/apis/resource"
 	resourcev1alpha1 "github.com/tektoncd/pipeline/pkg/apis/resource/v1alpha1"
@@ -151,8 +152,8 @@ func outputTestResourceSetup() {
 
 	outputTestResources = make(map[string]v1beta1.PipelineResourceInterface)
 	for _, r := range rs {
-		ri, _ := resource.FromType(r, images)
-		outputTestResources[r.Name] = ri
+		ri, _ := resource.FromType("", r, images)
+		outputResources[r.Name] = ri
 	}
 }
 
@@ -1358,7 +1359,7 @@ func resolveOutputResources(taskRun *v1beta1.TaskRun) map[string]v1beta1.Pipelin
 			i = outputTestResources[name]
 			resolved[r.Name] = i
 		} else if r.ResourceSpec != nil {
-			i, _ = resource.FromType(&resourcev1alpha1.PipelineResource{
+			i, _ = resource.FromType("", &v1alpha1.PipelineResource{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: r.Name,
 				},

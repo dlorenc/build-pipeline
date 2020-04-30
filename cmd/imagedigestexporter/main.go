@@ -63,10 +63,18 @@ func main() {
 		if err != nil {
 			logger.Fatalf("Unexpected error getting image digest for %s: %v", imageResource.Name, err)
 		}
+<<<<<<< HEAD
 		output = append(output, v1beta1.PipelineResourceResult{
 			Key:   "digest",
 			Value: digest.String(),
 			ResourceRef: v1beta1.PipelineResourceRef{
+=======
+		output = append(output, v1alpha1.PipelineResourceResult{
+			Key:          "digest",
+			Value:        digest.String(),
+			ResourceName: imageResource.Name,
+			ResourceRef: v1alpha1.PipelineResourceRef{
+>>>>>>> 76a9c304... In-toto.
 				Name: imageResource.Name,
 			},
 		})

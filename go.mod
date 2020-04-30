@@ -28,6 +28,7 @@ require (
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/hashicorp/golang-lru v0.5.3
 	github.com/imdario/mergo v0.3.8 // indirect
+	github.com/in-toto/in-toto-golang v0.0.0-20191106170227-857cd1cfa826
 	github.com/jenkins-x/go-scm v1.5.79
 	github.com/json-iterator/go v1.1.9 // indirect
 	github.com/mailru/easyjson v0.7.1 // indirect

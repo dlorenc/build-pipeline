@@ -21,6 +21,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline"
+	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1alpha1"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"github.com/tektoncd/pipeline/pkg/apis/resource"
 	resourcev1alpha1 "github.com/tektoncd/pipeline/pkg/apis/resource/v1alpha1"
@@ -279,7 +280,7 @@ func setUp() {
 	}}
 	inputResourceInterfaces = make(map[string]v1beta1.PipelineResourceInterface)
 	for _, r := range rs {
-		ri, _ := resource.FromType(r, images)
+		ri, _ := resource.FromType("", r, images)
 		inputResourceInterfaces[r.Name] = ri
 	}
 }
@@ -1428,7 +1429,7 @@ func mockResolveTaskResources(taskRun *v1beta1.TaskRun) map[string]v1beta1.Pipel
 			i = inputResourceInterfaces[r.ResourceRef.Name]
 			resolved[r.Name] = i
 		case r.ResourceSpec != nil:
-			i, _ = resource.FromType(&resourcev1alpha1.PipelineResource{
+			i, _ = resource.FromType("", &v1alpha1.PipelineResource{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: r.Name,
 				},

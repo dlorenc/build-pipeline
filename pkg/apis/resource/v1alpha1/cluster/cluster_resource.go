@@ -61,14 +61,14 @@ type Resource struct {
 }
 
 // NewResource create a new k8s cluster resource to pass to a pipeline task
-func NewResource(kubeconfigWriterImage string, r *resource.PipelineResource) (*Resource, error) {
+func NewResource(name, kubeconfigWriterImage string, r *resource.PipelineResource) (*Resource, error) {
 	if r.Spec.Type != resource.PipelineResourceTypeCluster {
 		return nil, fmt.Errorf("cluster.Resource: Cannot create a Cluster resource from a %s Pipeline Resource", r.Spec.Type)
 	}
 	clusterResource := Resource{
 		Type:                  r.Spec.Type,
 		KubeconfigWriterImage: kubeconfigWriterImage,
-		Name:                  r.Name,
+		Name:                  name,
 	}
 	for _, param := range r.Spec.Params {
 		switch {

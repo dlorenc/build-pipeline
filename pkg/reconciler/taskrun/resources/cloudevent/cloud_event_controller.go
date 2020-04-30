@@ -37,7 +37,7 @@ func InitializeCloudEvents(tr *v1beta1.TaskRun, prs []*resource.PipelineResource
 		var targets []string
 		for _, output := range prs {
 			if output.Spec.Type == resource.PipelineResourceTypeCloudEvent {
-				cer, _ := cloudevent.NewResource(output)
+				cer, _ := cloudevent.NewResource("", output)
 				targets = append(targets, cer.TargetURI)
 			}
 		}
