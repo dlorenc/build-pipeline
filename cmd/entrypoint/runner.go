@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -34,11 +35,45 @@ func (rr *realRunner) Run(args ...string) error {
 	defer signal.Reset()
 
 	cmd := exec.Command(name, args...)
+
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	// dedicated PID group used to forward signals to
 	// main process and all children
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
+	if os.Getenv("TEKTON_RESOURCE_NAME") == "" && os.Getenv("HERMETIC") == "1" {
+		fmt.Println("DROPPING NETWORK")
+
+		cmd.SysProcAttr.Cloneflags = syscall.CLONE_NEWNS |
+			// syscall.CLONE_NEWUTS |
+			// syscall.CLONE_NEWIPC |
+			syscall.CLONE_NEWPID |
+			syscall.CLONE_NEWNET |
+			syscall.CLONE_NEWUSER
+
+		cmd.SysProcAttr.GidMappingsEnableSetgroups = true
+
+		cmd.SysProcAttr.UidMappings = []syscall.SysProcIDMap{
+			{
+				ContainerID: 0,
+				HostID:      0,
+				// Map all users
+				Size: 4294967295,
+			},
+		}
+
+		cmd.SysProcAttr.GidMappings = []syscall.SysProcIDMap{
+			{
+				ContainerID: 0,
+				HostID:      0,
+
+				//  Map all groups
+				Size: 4294967295,
+			},
+		}
+
+	}
 
 	// Start defined command
 	if err := cmd.Start(); err != nil {

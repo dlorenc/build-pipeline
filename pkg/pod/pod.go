@@ -164,6 +164,15 @@ func (b *Builder) Build(ctx context.Context, taskRun *v1beta1.TaskRun, taskSpec 
 		stepContainers[i].Env = env
 	}
 
+	// Add hermetic env var
+	if taskRun.Annotations["tekton.dev/hermetic"] == "1" {
+		for i, s := range stepContainers {
+			// Add it at the end so it overrides
+			env := append(s.Env, corev1.EnvVar{Name: "HERMETIC", Value: "1"})
+			stepContainers[i].Env = env
+		}
+	}
+
 	// Add implicit volume mounts to each step, unless the step specifies
 	// its own volume mount at that path.
 	for i, s := range stepContainers {
