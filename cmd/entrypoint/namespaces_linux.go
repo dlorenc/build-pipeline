@@ -1,9 +1,24 @@
 package main
 
 import (
+	"math"
 	"os/exec"
 	"syscall"
 )
+
+// We need the max value of an unsigned 32 bit integer (4294967295), but we also need this number
+// to fit into an "int". One some systems this is 32 bits, so the max uint32 can't fit into here.
+// maxIntForArch is the higher of those two values.
+func maxIntForArch() int {
+	// We have to do over two lines as a variable. The go compiler optimizes
+	// away types for constants, so int(uint32(math.MaxUint32)) is the same as int(math.MaxUint32),
+	// which overflows.
+	maxUint := uint32(math.MaxUint32)
+	if int(maxUint) > math.MaxInt32 {
+		return int(maxUint)
+	}
+	return math.MaxInt32
+}
 
 // dropNetworking modifies the supplied exec.Cmd to execute in a net set of namespaces that do not
 // have network access
@@ -29,7 +44,7 @@ func dropNetworking(cmd *exec.Cmd) {
 			ContainerID: 0,
 			HostID:      0,
 			// Map all users
-			Size: 4294967295,
+			Size: maxIntForArch(),
 		},
 	}
 
@@ -44,7 +59,7 @@ func dropNetworking(cmd *exec.Cmd) {
 			HostID:      0,
 
 			//  Map all groups
-			Size: 4294967295,
+			Size: maxIntForArch(),
 		},
 	}
 }
